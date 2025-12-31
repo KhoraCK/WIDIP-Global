@@ -739,7 +739,7 @@ npm run dev
 |----------------|-------------|
 | **Chat IA** | Conversation avec l'IA Mistral, contexte WIDIP |
 | **Historique** | Conservation des conversations précédentes |
-| **Upload fichiers** | Joindre PDF, TXT, Markdown, CSV, JSON |
+| **Upload fichiers** | Interface présente mais **NON FONCTIONNEL** (à améliorer) |
 | **Modes de chat** | Code, Flash, Pro selon le besoin |
 | **Markdown** | Réponses formatées avec code coloré |
 | **Copie code** | Bouton copier sur les blocs de code |
@@ -826,6 +826,78 @@ curl -X POST http://localhost:8080/webhook/wibot/rag/ingest \
   -d '{"mode": "incremental"}'
 ```
 
+### Pièces jointes - État actuel et amélioration prévue
+
+**État actuel : NON FONCTIONNEL**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    DIAGNOSTIC PIÈCES JOINTES                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  FRONTEND (InputBar.tsx)                                                 │
+│  ├── ✅ Interface drag & drop fonctionnelle                             │
+│  ├── ✅ Lecture fichiers en base64                                      │
+│  ├── ✅ Envoi via API avec files: [{name, content}]                     │
+│  └── ✅ Formats acceptés: PDF, TXT, MD, CSV, JSON                       │
+│                                                                          │
+│  BACKEND (chat_main.json)                                                │
+│  ├── ❌ Le workflow IGNORE body.files                                   │
+│  ├── ❌ Seuls message, mode, conversation_id sont extraits              │
+│  └── ❌ Fichiers jamais traités ni stockés                              │
+│                                                                          │
+│  RÉSULTAT : L'utilisateur peut glisser des fichiers mais ils sont       │
+│             complètement ignorés par le backend !                        │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Architecture proposée : RAG Temporaire par Conversation**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│              SOLUTION : INGESTION RAG TEMPORAIRE                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  1. UPLOAD (modification chat_main.json)                                 │
+│  ┌───────────────────────────────────────────────────────────────┐      │
+│  │  Fichier glissé → base64 → Backend                             │      │
+│  │       │                                                        │      │
+│  │       ▼                                                        │      │
+│  │  Décoder base64 → Extraire texte (PDF/DOCX/TXT/etc)           │      │
+│  │       │                                                        │      │
+│  │       ▼                                                        │      │
+│  │  Chunking + Embedding Mistral                                  │      │
+│  │       │                                                        │      │
+│  │       ▼                                                        │      │
+│  │  INSERT INTO n8n_vectors                                       │      │
+│  │    metadata = {                                                │      │
+│  │      "category": "temp",                                       │      │
+│  │      "conversation_id": "uuid-conv",                           │      │
+│  │      "source": "document.pdf",                                 │      │
+│  │      "user_id": 123                                            │      │
+│  │    }                                                           │      │
+│  │       │                                                        │      │
+│  │       ▼                                                        │      │
+│  │  IA a maintenant accès au contenu via RAG                     │      │
+│  └───────────────────────────────────────────────────────────────┘      │
+│                                                                          │
+│  2. NETTOYAGE (modification delete_conversation.json)                    │
+│  ┌───────────────────────────────────────────────────────────────┐      │
+│  │  DELETE FROM n8n_vectors                                       │      │
+│  │  WHERE metadata->>'category' = 'temp'                          │      │
+│  │    AND metadata->>'conversation_id' = :conv_id                 │      │
+│  └───────────────────────────────────────────────────────────────┘      │
+│                                                                          │
+│  3. RECHERCHE (le RAG filtre automatiquement)                            │
+│  ┌───────────────────────────────────────────────────────────────┐      │
+│  │  Documents permanents : toujours accessibles                   │      │
+│  │  Documents temp : uniquement pour leur conversation            │      │
+│  └───────────────────────────────────────────────────────────────┘      │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## 11. Pistes d'Amélioration
@@ -843,8 +915,14 @@ curl -X POST http://localhost:8080/webhook/wibot/rag/ingest \
 │  ├── MFA (Multi-Factor Authentication)                                  │
 │  └── Session management avancé                                          │
 │                                                                          │
+│  📎 PIÈCES JOINTES - PRIORITÉ HAUTE                                     │
+│  ├── Traitement des fichiers uploadés (actuellement ignorés!)          │
+│  ├── Ingestion RAG temporaire par conversation                          │
+│  ├── Nettoyage automatique à la suppression de conversation             │
+│  └── Support PDF, DOCX, TXT, MD, CSV, JSON, XLSX                        │
+│                                                                          │
 │  📚 RAG - AMÉLIORATIONS (base déjà fonctionnelle)                       │
-│  ├── Filtrage par permissions utilisateur ⬅️ PRIORITÉ                   │
+│  ├── Filtrage par permissions utilisateur                               │
 │  ├── Connecteurs sources externes (GLPI, SharePoint, Confluence)        │
 │  ├── Interface d'upload admin pour nouveaux documents                   │
 │  └── Statistiques d'utilisation du RAG                                  │
