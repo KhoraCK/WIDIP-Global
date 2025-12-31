@@ -96,7 +96,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Nettoyer le dossier de fichiers temporaires\nconst fs = require('fs');\nconst path = require('path');\n\nconst convId = $input.first().json.conversationId;\nconst uploadDir = `/tmp/wibot-uploads/${convId}`;\n\ntry {\n  if (fs.existsSync(uploadDir)) {\n    // Supprimer tous les fichiers du dossier\n    const files = fs.readdirSync(uploadDir);\n    for (const file of files) {\n      fs.unlinkSync(path.join(uploadDir, file));\n    }\n    // Supprimer le dossier\n    fs.rmdirSync(uploadDir);\n  }\n} catch (err) {\n  console.error('Error cleaning upload dir:', err.message);\n}\n\nreturn $input.all();"
+        "jsCode": "// Nettoyer le dossier de fichiers temporaires\nconst fs = require('fs');\nconst path = require('path');\n\n// IMPORTANT: Recuperer conversationId depuis Verify JWT, pas depuis $input\nconst convId = $('Verify JWT').first().json.conversationId;\n// Utiliser le dossier rag-documents/temp-uploads qui est monte en rw\nconst uploadDir = `/home/node/.n8n-files/rag-documents/temp-uploads/${convId}`;\n\ntry {\n  if (fs.existsSync(uploadDir)) {\n    // Supprimer tous les fichiers du dossier\n    const files = fs.readdirSync(uploadDir);\n    for (const file of files) {\n      fs.unlinkSync(path.join(uploadDir, file));\n    }\n    // Supprimer le dossier\n    fs.rmdirSync(uploadDir);\n  }\n} catch (err) {\n  console.error('Error cleaning upload dir:', err.message);\n}\n\nreturn $input.all();"
       },
       "id": "cleanup-files",
       "name": "Cleanup Files",
