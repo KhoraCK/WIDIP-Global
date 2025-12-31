@@ -704,7 +704,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Traitement des pieces jointes\nconst fs = require('fs');\nconst path = require('path');\nconst http = require('http');\n\nconst data = $input.first().json;\n\n// Si pas de fichiers, passer directement\nif (!data.hasFiles || !data.files || data.files.length === 0) {\n  return [{ json: data }];\n}\n\nconst convId = data.conversationId;\nconst userId = data.userId;\nconst uploadDir = `/tmp/wibot-uploads/${convId}`;\n\n// Creer le dossier si necessaire\nif (!fs.existsSync('/tmp/wibot-uploads')) {\n  fs.mkdirSync('/tmp/wibot-uploads', { recursive: true });\n}\nif (!fs.existsSync(uploadDir)) {\n  fs.mkdirSync(uploadDir, { recursive: true });\n}\n\n// Sauvegarder chaque fichier\nconst savedFiles = [];\nfor (const file of data.files) {\n  try {\n    const content = Buffer.from(file.content, 'base64');\n    const filePath = path.join(uploadDir, file.name);\n    fs.writeFileSync(filePath, content);\n    savedFiles.push(file.name);\n  } catch (err) {\n    console.error('Error saving file:', file.name, err.message);\n  }\n}\n\n// Appeler rag_ingestion via HTTP interne\nif (savedFiles.length > 0) {\n  const postData = JSON.stringify({\n    mode: 'incremental',\n    path: uploadDir,\n    category: 'temp',\n    conversation_id: convId,\n    user_id: userId\n  });\n  \n  const options = {\n    hostname: 'localhost',\n    port: 5678,\n    path: '/webhook/wibot/rag/ingest',\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\n      'Content-Length': Buffer.byteLength(postData)\n    }\n  };\n  \n  // Appel synchrone via Promise\n  await new Promise((resolve, reject) => {\n    const req = http.request(options, (res) => {\n      let body = '';\n      res.on('data', chunk => body += chunk);\n      res.on('end', () => {\n        console.log('RAG Ingestion response:', body);\n        resolve(body);\n      });\n    });\n    req.on('error', (err) => {\n      console.error('RAG Ingestion error:', err.message);\n      resolve(null); // Ne pas bloquer si erreur\n    });\n    req.write(postData);\n    req.end();\n  });\n}\n\n// Retourner les donnees avec info fichiers traites\nreturn [{ \n  json: { \n    ...data, \n    filesProcessed: savedFiles,\n    filesCount: savedFiles.length\n  } \n}];"
+        "jsCode": "// Traitement des pieces jointes - sauvegarde uniquement\nconst data = $input.first().json;\n\n// Si pas de fichiers, passer directement\nif (!data.hasFiles || !data.files || data.files.length === 0) {\n  return [{ json: { ...data, filesProcessed: [], filesCount: 0, uploadDir: null } }];\n}\n\nconst convId = data.conversationId;\nconst userId = data.userId;\nconst uploadDir = `/tmp/wibot-uploads/${convId}`;\n\n// Creer les dossiers si necessaires\nconst fs = require('fs');\nif (!fs.existsSync('/tmp/wibot-uploads')) {\n  fs.mkdirSync('/tmp/wibot-uploads', { recursive: true });\n}\nif (!fs.existsSync(uploadDir)) {\n  fs.mkdirSync(uploadDir, { recursive: true });\n}\n\n// Sauvegarder chaque fichier\nconst savedFiles = [];\nfor (const file of data.files) {\n  try {\n    const content = Buffer.from(file.content, 'base64');\n    const filePath = `${uploadDir}/${file.name}`;\n    fs.writeFileSync(filePath, content);\n    savedFiles.push(file.name);\n  } catch (err) {\n    console.error('Error saving file:', file.name, err.message);\n  }\n}\n\n// Retourner les donnees avec info fichiers traites\nreturn [{ \n  json: { \n    ...data, \n    filesProcessed: savedFiles,\n    filesCount: savedFiles.length,\n    uploadDir: uploadDir\n  } \n}];"
       },
       "id": "process-files-node",
       "name": "Process Files",
@@ -713,6 +713,71 @@
       "position": [
         -780,
         928
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-has-files",
+              "leftValue": "={{ $json.filesCount }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "has-files-node",
+      "name": "Has Files?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -590,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/wibot/rag/ingest",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"mode\": \"incremental\",\n  \"path\": \"{{ $json.uploadDir }}\",\n  \"category\": \"temp\",\n  \"conversation_id\": \"{{ $json.conversationId }}\",\n  \"user_id\": {{ $json.userId }}\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "call-rag-ingestion-node",
+      "name": "Call RAG Ingestion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -400,
+        870
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Recuperer les donnees originales apres l'appel RAG\nconst originalData = $('Process Files').first().json;\nreturn [{ json: originalData }];"
+      },
+      "id": "merge-after-rag-node",
+      "name": "Merge After RAG",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -200,
+        870
       ]
     }
   ],
@@ -759,6 +824,46 @@
       ]
     },
     "Process Files": {
+      "main": [
+        [
+          {
+            "node": "Has Files?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Files?": {
+      "main": [
+        [
+          {
+            "node": "Call RAG Ingestion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Quota",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call RAG Ingestion": {
+      "main": [
+        [
+          {
+            "node": "Merge After RAG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge After RAG": {
       "main": [
         [
           {
