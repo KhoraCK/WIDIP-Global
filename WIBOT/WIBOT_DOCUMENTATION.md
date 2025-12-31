@@ -739,7 +739,7 @@ npm run dev
 |----------------|-------------|
 | **Chat IA** | Conversation avec l'IA Mistral, contexte WIDIP |
 | **Historique** | Conservation des conversations précédentes |
-| **Upload fichiers** | Joindre PDF, TXT, Markdown, CSV, JSON |
+| **Upload fichiers** | Drag & drop de fichiers → ingestion RAG temporaire |
 | **Modes de chat** | Code, Flash, Pro selon le besoin |
 | **Markdown** | Réponses formatées avec code coloré |
 | **Copie code** | Bouton copier sur les blocs de code |
@@ -748,9 +748,163 @@ npm run dev
 
 ---
 
-## 10. Pistes d'Amélioration
+## 10. RAG - Système Déjà Implémenté
 
-### Améliorations identifiées
+### Workflow RAG Ingestion v2 - Multi-Format
+
+Le système RAG est **déjà opérationnel** avec un workflow complet :
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    RAG INGESTION v2 - EXISTANT ✅                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  FORMATS SUPPORTÉS :                                                     │
+│  ├── .md     Markdown                                                   │
+│  ├── .txt    Texte brut                                                 │
+│  ├── .pdf    PDF (extraction native n8n)                                │
+│  ├── .docx   Word (extraction native n8n)                               │
+│  ├── .doc    Word legacy                                                │
+│  ├── .xlsx   Excel (conversion lignes → texte)                          │
+│  ├── .xls    Excel legacy                                               │
+│  ├── .csv    CSV (détection colonnes automatique)                       │
+│  ├── .json   JSON (aplatissement récursif)                              │
+│  └── .html   HTML (nettoyage balises automatique)                       │
+│                                                                          │
+│  CATÉGORISATION AUTOMATIQUE :                                            │
+│  ┌─────────────────┬──────────────────────────────────────────────┐     │
+│  │ Chemin/Préfixe  │ Catégorie assignée                           │     │
+│  ├─────────────────┼──────────────────────────────────────────────┤     │
+│  │ /procedures/    │ procedure                                    │     │
+│  │ PROC_*          │ procedure                                    │     │
+│  │ /clients/       │ client                                       │     │
+│  │ CLIENT_*        │ client                                       │     │
+│  │ /tickets/       │ ticket                                       │     │
+│  │ TICKET_*        │ ticket                                       │     │
+│  │ /documentation/ │ documentation                                │     │
+│  │ DOC_*           │ documentation                                │     │
+│  │ /faq/           │ faq                                          │     │
+│  │ Autres          │ general                                      │     │
+│  └─────────────────┴──────────────────────────────────────────────┘     │
+│                                                                          │
+│  MODES DE DÉCLENCHEMENT :                                                │
+│  ├── Manuel     → Full refresh (clear + ré-ingestion complète)          │
+│  ├── Webhook    → POST /webhook/wibot/rag/ingest (incrémental/full)    │
+│  └── Cron       → Tous les dimanches à 3h (incrémental)                 │
+│                                                                          │
+│  PIPELINE TECHNIQUE :                                                    │
+│  ┌─────────┐   ┌──────────┐   ┌─────────┐   ┌──────────┐   ┌─────────┐ │
+│  │  Scan   │──►│ Switch   │──►│ Extract │──►│  Chunk   │──►│ Mistral │ │
+│  │Directory│   │Extension │   │ Content │   │(overlap) │   │ Embed   │ │
+│  └─────────┘   └──────────┘   └─────────┘   └──────────┘   └────┬────┘ │
+│                                                                  │      │
+│                                                                  ▼      │
+│                                                           ┌──────────┐  │
+│                                                           │ PGVector │  │
+│                                                           │  Store   │  │
+│                                                           └──────────┘  │
+│                                                                          │
+│  MÉTADONNÉES STOCKÉES :                                                  │
+│  ├── source    (nom du fichier)                                         │
+│  ├── category  (catégorie auto-détectée)                                │
+│  ├── path      (chemin relatif)                                         │
+│  └── hash      (MD5 pour détection changements)                         │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Endpoint RAG disponible
+
+```bash
+# Déclencher une ingestion manuelle
+curl -X POST http://localhost:8080/webhook/wibot/rag/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "full", "clear": true}'
+
+# Ingestion incrémentale
+curl -X POST http://localhost:8080/webhook/wibot/rag/ingest \
+  -d '{"mode": "incremental"}'
+```
+
+### Pièces jointes - Système Implémenté
+
+**État actuel : FONCTIONNEL ✅**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    PIÈCES JOINTES - IMPLÉMENTÉ                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  FRONTEND (InputBar.tsx)                                                 │
+│  ├── ✅ Interface drag & drop fonctionnelle                             │
+│  ├── ✅ Lecture fichiers en base64                                      │
+│  ├── ✅ Envoi via API avec files: [{name, content}]                     │
+│  └── ✅ Formats acceptés: PDF, TXT, MD, CSV, JSON, DOCX, XLSX           │
+│                                                                          │
+│  BACKEND (chat_main.json)                                                │
+│  ├── ✅ Extraction de body.files dans Verify JWT                        │
+│  ├── ✅ Node "Process Files" : decode base64 et sauvegarde              │
+│  ├── ✅ Appel HTTP vers rag_ingestion avec category="temp"              │
+│  └── ✅ Fichiers ingérés dans PGVector avec conversation_id             │
+│                                                                          │
+│  NETTOYAGE (delete_conversation.json)                                    │
+│  ├── ✅ DELETE FROM n8n_vectors WHERE category='temp' AND conv_id       │
+│  └── ✅ Suppression du dossier /tmp/wibot-uploads/{conv_id}/            │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Architecture : RAG Temporaire par Conversation**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│              SOLUTION : INGESTION RAG TEMPORAIRE                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  1. UPLOAD (modification chat_main.json)                                 │
+│  ┌───────────────────────────────────────────────────────────────┐      │
+│  │  Fichier glissé → base64 → Backend                             │      │
+│  │       │                                                        │      │
+│  │       ▼                                                        │      │
+│  │  Décoder base64 → Extraire texte (PDF/DOCX/TXT/etc)           │      │
+│  │       │                                                        │      │
+│  │       ▼                                                        │      │
+│  │  Chunking + Embedding Mistral                                  │      │
+│  │       │                                                        │      │
+│  │       ▼                                                        │      │
+│  │  INSERT INTO n8n_vectors                                       │      │
+│  │    metadata = {                                                │      │
+│  │      "category": "temp",                                       │      │
+│  │      "conversation_id": "uuid-conv",                           │      │
+│  │      "source": "document.pdf",                                 │      │
+│  │      "user_id": 123                                            │      │
+│  │    }                                                           │      │
+│  │       │                                                        │      │
+│  │       ▼                                                        │      │
+│  │  IA a maintenant accès au contenu via RAG                     │      │
+│  └───────────────────────────────────────────────────────────────┘      │
+│                                                                          │
+│  2. NETTOYAGE (modification delete_conversation.json)                    │
+│  ┌───────────────────────────────────────────────────────────────┐      │
+│  │  DELETE FROM n8n_vectors                                       │      │
+│  │  WHERE metadata->>'category' = 'temp'                          │      │
+│  │    AND metadata->>'conversation_id' = :conv_id                 │      │
+│  └───────────────────────────────────────────────────────────────┘      │
+│                                                                          │
+│  3. RECHERCHE (le RAG filtre automatiquement)                            │
+│  ┌───────────────────────────────────────────────────────────────┐      │
+│  │  Documents permanents : toujours accessibles                   │      │
+│  │  Documents temp : uniquement pour leur conversation            │      │
+│  └───────────────────────────────────────────────────────────────┘      │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 11. Pistes d'Amélioration
+
+### Ce qui reste à faire
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -763,12 +917,17 @@ npm run dev
 │  ├── MFA (Multi-Factor Authentication)                                  │
 │  └── Session management avancé                                          │
 │                                                                          │
-│  📚 RAG (Retrieval Augmented Generation)                                │
-│  ├── Ingestion automatique de documents                                 │
-│  ├── Recherche vectorielle (pgvector)                                   │
-│  ├── Sources de données multiples (GLPI, SharePoint, etc.)             │
-│  ├── Chunking intelligent des documents                                 │
-│  └── Filtrage par permissions utilisateur                               │
+│  ✅ PIÈCES JOINTES - IMPLÉMENTÉ                                         │
+│  ├── ✅ Traitement des fichiers uploadés                                │
+│  ├── ✅ Ingestion RAG temporaire par conversation                       │
+│  ├── ✅ Nettoyage automatique à la suppression de conversation          │
+│  └── ✅ Support PDF, DOCX, TXT, MD, CSV, JSON, XLSX                     │
+│                                                                          │
+│  📚 RAG - AMÉLIORATIONS (base déjà fonctionnelle)                       │
+│  ├── Filtrage par permissions utilisateur                               │
+│  ├── Connecteurs sources externes (GLPI, SharePoint, Confluence)        │
+│  ├── Interface d'upload admin pour nouveaux documents                   │
+│  └── Statistiques d'utilisation du RAG                                  │
 │                                                                          │
 │  🎛️ ADMINISTRATION                                                       │
 │  ├── Interface d'administration                                         │

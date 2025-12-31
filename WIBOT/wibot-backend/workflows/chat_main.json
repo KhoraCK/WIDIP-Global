@@ -20,7 +20,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const authHeader = $input.first().json.headers.authorization;\nconst body = $input.first().json.body;\n\nif (!authHeader || !authHeader.startsWith('Bearer ')) {\n  return [{ json: { valid: false, error: 'No token provided' } }];\n}\n\nconst token = authHeader.substring(7);\nconst parts = token.split('.');\n\nif (parts.length !== 3) {\n  return [{ json: { valid: false, error: 'Invalid token format' } }];\n}\n\ntry {\n  const payload = parts[1];\n  const decoded = JSON.parse(Buffer.from(payload, 'base64').toString());\n  \n  if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) {\n    return [{ json: { valid: false, error: 'Token expired' } }];\n  }\n  \n  // Recuperer le mode (code, flash, redaction) - defaut: flash\n  const mode = body.mode || 'flash';\n  \n  return [{ \n    json: { \n      valid: true, \n      user: decoded,\n      userId: decoded.userId,\n      conversationId: body.conversation_id,\n      message: body.message,\n      mode: mode,\n      sessionId: `${decoded.userId}_${body.conversation_id}`\n    } \n  }];\n} catch (err) {\n  return [{ json: { valid: false, error: 'Invalid token' } }];\n}"
+        "jsCode": "const authHeader = $input.first().json.headers.authorization;\nconst body = $input.first().json.body;\n\nif (!authHeader || !authHeader.startsWith('Bearer ')) {\n  return [{ json: { valid: false, error: 'No token provided' } }];\n}\n\nconst token = authHeader.substring(7);\nconst parts = token.split('.');\n\nif (parts.length !== 3) {\n  return [{ json: { valid: false, error: 'Invalid token format' } }];\n}\n\ntry {\n  const payload = parts[1];\n  const decoded = JSON.parse(Buffer.from(payload, 'base64').toString());\n  \n  if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) {\n    return [{ json: { valid: false, error: 'Token expired' } }];\n  }\n  \n  // Recuperer le mode (code, flash, redaction) - defaut: flash\n  const mode = body.mode || 'flash';\n  \n  // Recuperer les fichiers joints si presents\n  const files = body.files || [];\n  \n  return [{ \n    json: { \n      valid: true, \n      user: decoded,\n      userId: decoded.userId,\n      conversationId: body.conversation_id,\n      message: body.message,\n      mode: mode,\n      files: files,\n      hasFiles: files.length > 0,\n      sessionId: `${decoded.userId}_${body.conversation_id}`\n    } \n  }];\n} catch (err) {\n  return [{ json: { valid: false, error: 'Invalid token' } }];\n}"
       },
       "id": "503b6357-4e37-4e80-8597-dca9316f2ccf",
       "name": "Verify JWT",
@@ -701,6 +701,84 @@
           "name": "Mistral API"
         }
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Traitement des pieces jointes - sauvegarde uniquement\nconst data = $input.first().json;\n\n// Si pas de fichiers, passer directement\nif (!data.hasFiles || !data.files || data.files.length === 0) {\n  return [{ json: { ...data, filesProcessed: [], filesCount: 0, uploadDir: null } }];\n}\n\nconst convId = data.conversationId;\nconst userId = data.userId;\nconst uploadDir = `/tmp/wibot-uploads/${convId}`;\n\n// Creer les dossiers si necessaires\nconst fs = require('fs');\nif (!fs.existsSync('/tmp/wibot-uploads')) {\n  fs.mkdirSync('/tmp/wibot-uploads', { recursive: true });\n}\nif (!fs.existsSync(uploadDir)) {\n  fs.mkdirSync(uploadDir, { recursive: true });\n}\n\n// Sauvegarder chaque fichier\nconst savedFiles = [];\nfor (const file of data.files) {\n  try {\n    const content = Buffer.from(file.content, 'base64');\n    const filePath = `${uploadDir}/${file.name}`;\n    fs.writeFileSync(filePath, content);\n    savedFiles.push(file.name);\n  } catch (err) {\n    console.error('Error saving file:', file.name, err.message);\n  }\n}\n\n// Retourner les donnees avec info fichiers traites\nreturn [{ \n  json: { \n    ...data, \n    filesProcessed: savedFiles,\n    filesCount: savedFiles.length,\n    uploadDir: uploadDir\n  } \n}];"
+      },
+      "id": "process-files-node",
+      "name": "Process Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -780,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-has-files",
+              "leftValue": "={{ $json.filesCount }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "has-files-node",
+      "name": "Has Files?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -590,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/wibot/rag/ingest",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"mode\": \"incremental\",\n  \"path\": \"{{ $json.uploadDir }}\",\n  \"category\": \"temp\",\n  \"conversation_id\": \"{{ $json.conversationId }}\",\n  \"user_id\": {{ $json.userId }}\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "call-rag-ingestion-node",
+      "name": "Call RAG Ingestion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -400,
+        870
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Recuperer les donnees originales apres l'appel RAG\nconst originalData = $('Process Files').first().json;\nreturn [{ json: originalData }];"
+      },
+      "id": "merge-after-rag-node",
+      "name": "Merge After RAG",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -200,
+        870
+      ]
     }
   ],
   "pinData": {},
@@ -731,7 +809,7 @@
       "main": [
         [
           {
-            "node": "Check Quota",
+            "node": "Process Files",
             "type": "main",
             "index": 0
           }
@@ -739,6 +817,57 @@
         [
           {
             "node": "Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Files": {
+      "main": [
+        [
+          {
+            "node": "Has Files?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Files?": {
+      "main": [
+        [
+          {
+            "node": "Call RAG Ingestion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Quota",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call RAG Ingestion": {
+      "main": [
+        [
+          {
+            "node": "Merge After RAG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge After RAG": {
+      "main": [
+        [
+          {
+            "node": "Check Quota",
             "type": "main",
             "index": 0
           }

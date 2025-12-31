@@ -79,14 +79,42 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "DELETE FROM conversations\nWHERE conversation_id = '{{ $json.conversationId }}'::uuid\n  AND user_id = {{ $json.userId }}\nRETURNING conversation_id::text;",
+        "query": "DELETE FROM n8n_vectors\nWHERE metadata->>'category' = 'temp'\n  AND metadata->>'conversation_id' = '{{ $json.conversationId }}';",
+        "options": {}
+      },
+      "id": "delete-temp-vectors",
+      "name": "Delete Temp Vectors",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [910, 100],
+      "credentials": {
+        "postgres": {
+          "id": "yY2GzRzLXTG4anFZ",
+          "name": "WIBOT PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Nettoyer le dossier de fichiers temporaires\nconst fs = require('fs');\nconst path = require('path');\n\nconst convId = $input.first().json.conversationId;\nconst uploadDir = `/tmp/wibot-uploads/${convId}`;\n\ntry {\n  if (fs.existsSync(uploadDir)) {\n    // Supprimer tous les fichiers du dossier\n    const files = fs.readdirSync(uploadDir);\n    for (const file of files) {\n      fs.unlinkSync(path.join(uploadDir, file));\n    }\n    // Supprimer le dossier\n    fs.rmdirSync(uploadDir);\n  }\n} catch (err) {\n  console.error('Error cleaning upload dir:', err.message);\n}\n\nreturn $input.all();"
+      },
+      "id": "cleanup-files",
+      "name": "Cleanup Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, 100]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DELETE FROM conversations\nWHERE conversation_id = '{{ $('Verify JWT').first().json.conversationId }}'::uuid\n  AND user_id = {{ $('Verify JWT').first().json.userId }}\nRETURNING conversation_id::text;",
         "options": {}
       },
       "id": "delete-conversation",
       "name": "Delete Conversation",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [910, 200],
+      "position": [1130, 100],
       "credentials": {
         "postgres": {
           "id": "yY2GzRzLXTG4anFZ",
@@ -154,7 +182,7 @@
       "main": [
         [
           {
-            "node": "Delete Conversation",
+            "node": "Delete Temp Vectors",
             "type": "main",
             "index": 0
           }
@@ -162,6 +190,28 @@
         [
           {
             "node": "Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Temp Vectors": {
+      "main": [
+        [
+          {
+            "node": "Cleanup Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cleanup Files": {
+      "main": [
+        [
+          {
+            "node": "Delete Conversation",
             "type": "main",
             "index": 0
           }
