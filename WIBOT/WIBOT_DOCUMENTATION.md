@@ -849,7 +849,7 @@ curl -X POST http://localhost:8080/webhook/wibot/rag/ingest \
 │                                                                          │
 │  NETTOYAGE (delete_conversation.json)                                    │
 │  ├── ✅ DELETE FROM n8n_vectors WHERE category='temp' AND conv_id       │
-│  └── ✅ Suppression du dossier /tmp/wibot-uploads/{conv_id}/            │
+│  └── ✅ Suppression du dossier n8n-files/wibot-uploads/{conv_id}/       │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
