@@ -739,7 +739,7 @@ npm run dev
 |----------------|-------------|
 | **Chat IA** | Conversation avec l'IA Mistral, contexte WIDIP |
 | **Historique** | Conservation des conversations précédentes |
-| **Upload fichiers** | Interface présente mais **NON FONCTIONNEL** (à améliorer) |
+| **Upload fichiers** | Drag & drop de fichiers → ingestion RAG temporaire |
 | **Modes de chat** | Code, Flash, Pro selon le besoin |
 | **Markdown** | Réponses formatées avec code coloré |
 | **Copie code** | Bouton copier sur les blocs de code |
@@ -826,33 +826,35 @@ curl -X POST http://localhost:8080/webhook/wibot/rag/ingest \
   -d '{"mode": "incremental"}'
 ```
 
-### Pièces jointes - État actuel et amélioration prévue
+### Pièces jointes - Système Implémenté
 
-**État actuel : NON FONCTIONNEL**
+**État actuel : FONCTIONNEL ✅**
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    DIAGNOSTIC PIÈCES JOINTES                             │
+│                    PIÈCES JOINTES - IMPLÉMENTÉ                           │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
 │  FRONTEND (InputBar.tsx)                                                 │
 │  ├── ✅ Interface drag & drop fonctionnelle                             │
 │  ├── ✅ Lecture fichiers en base64                                      │
 │  ├── ✅ Envoi via API avec files: [{name, content}]                     │
-│  └── ✅ Formats acceptés: PDF, TXT, MD, CSV, JSON                       │
+│  └── ✅ Formats acceptés: PDF, TXT, MD, CSV, JSON, DOCX, XLSX           │
 │                                                                          │
 │  BACKEND (chat_main.json)                                                │
-│  ├── ❌ Le workflow IGNORE body.files                                   │
-│  ├── ❌ Seuls message, mode, conversation_id sont extraits              │
-│  └── ❌ Fichiers jamais traités ni stockés                              │
+│  ├── ✅ Extraction de body.files dans Verify JWT                        │
+│  ├── ✅ Node "Process Files" : decode base64 et sauvegarde              │
+│  ├── ✅ Appel HTTP vers rag_ingestion avec category="temp"              │
+│  └── ✅ Fichiers ingérés dans PGVector avec conversation_id             │
 │                                                                          │
-│  RÉSULTAT : L'utilisateur peut glisser des fichiers mais ils sont       │
-│             complètement ignorés par le backend !                        │
+│  NETTOYAGE (delete_conversation.json)                                    │
+│  ├── ✅ DELETE FROM n8n_vectors WHERE category='temp' AND conv_id       │
+│  └── ✅ Suppression du dossier /tmp/wibot-uploads/{conv_id}/            │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Architecture proposée : RAG Temporaire par Conversation**
+**Architecture : RAG Temporaire par Conversation**
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -915,11 +917,11 @@ curl -X POST http://localhost:8080/webhook/wibot/rag/ingest \
 │  ├── MFA (Multi-Factor Authentication)                                  │
 │  └── Session management avancé                                          │
 │                                                                          │
-│  📎 PIÈCES JOINTES - PRIORITÉ HAUTE                                     │
-│  ├── Traitement des fichiers uploadés (actuellement ignorés!)          │
-│  ├── Ingestion RAG temporaire par conversation                          │
-│  ├── Nettoyage automatique à la suppression de conversation             │
-│  └── Support PDF, DOCX, TXT, MD, CSV, JSON, XLSX                        │
+│  ✅ PIÈCES JOINTES - IMPLÉMENTÉ                                         │
+│  ├── ✅ Traitement des fichiers uploadés                                │
+│  ├── ✅ Ingestion RAG temporaire par conversation                       │
+│  ├── ✅ Nettoyage automatique à la suppression de conversation          │
+│  └── ✅ Support PDF, DOCX, TXT, MD, CSV, JSON, XLSX                     │
 │                                                                          │
 │  📚 RAG - AMÉLIORATIONS (base déjà fonctionnelle)                       │
 │  ├── Filtrage par permissions utilisateur                               │
