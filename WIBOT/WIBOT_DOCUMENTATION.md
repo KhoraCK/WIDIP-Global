@@ -748,9 +748,89 @@ npm run dev
 
 ---
 
-## 10. Pistes d'Amélioration
+## 10. RAG - Système Déjà Implémenté
 
-### Améliorations identifiées
+### Workflow RAG Ingestion v2 - Multi-Format
+
+Le système RAG est **déjà opérationnel** avec un workflow complet :
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    RAG INGESTION v2 - EXISTANT ✅                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  FORMATS SUPPORTÉS :                                                     │
+│  ├── .md     Markdown                                                   │
+│  ├── .txt    Texte brut                                                 │
+│  ├── .pdf    PDF (extraction native n8n)                                │
+│  ├── .docx   Word (extraction native n8n)                               │
+│  ├── .doc    Word legacy                                                │
+│  ├── .xlsx   Excel (conversion lignes → texte)                          │
+│  ├── .xls    Excel legacy                                               │
+│  ├── .csv    CSV (détection colonnes automatique)                       │
+│  ├── .json   JSON (aplatissement récursif)                              │
+│  └── .html   HTML (nettoyage balises automatique)                       │
+│                                                                          │
+│  CATÉGORISATION AUTOMATIQUE :                                            │
+│  ┌─────────────────┬──────────────────────────────────────────────┐     │
+│  │ Chemin/Préfixe  │ Catégorie assignée                           │     │
+│  ├─────────────────┼──────────────────────────────────────────────┤     │
+│  │ /procedures/    │ procedure                                    │     │
+│  │ PROC_*          │ procedure                                    │     │
+│  │ /clients/       │ client                                       │     │
+│  │ CLIENT_*        │ client                                       │     │
+│  │ /tickets/       │ ticket                                       │     │
+│  │ TICKET_*        │ ticket                                       │     │
+│  │ /documentation/ │ documentation                                │     │
+│  │ DOC_*           │ documentation                                │     │
+│  │ /faq/           │ faq                                          │     │
+│  │ Autres          │ general                                      │     │
+│  └─────────────────┴──────────────────────────────────────────────┘     │
+│                                                                          │
+│  MODES DE DÉCLENCHEMENT :                                                │
+│  ├── Manuel     → Full refresh (clear + ré-ingestion complète)          │
+│  ├── Webhook    → POST /webhook/wibot/rag/ingest (incrémental/full)    │
+│  └── Cron       → Tous les dimanches à 3h (incrémental)                 │
+│                                                                          │
+│  PIPELINE TECHNIQUE :                                                    │
+│  ┌─────────┐   ┌──────────┐   ┌─────────┐   ┌──────────┐   ┌─────────┐ │
+│  │  Scan   │──►│ Switch   │──►│ Extract │──►│  Chunk   │──►│ Mistral │ │
+│  │Directory│   │Extension │   │ Content │   │(overlap) │   │ Embed   │ │
+│  └─────────┘   └──────────┘   └─────────┘   └──────────┘   └────┬────┘ │
+│                                                                  │      │
+│                                                                  ▼      │
+│                                                           ┌──────────┐  │
+│                                                           │ PGVector │  │
+│                                                           │  Store   │  │
+│                                                           └──────────┘  │
+│                                                                          │
+│  MÉTADONNÉES STOCKÉES :                                                  │
+│  ├── source    (nom du fichier)                                         │
+│  ├── category  (catégorie auto-détectée)                                │
+│  ├── path      (chemin relatif)                                         │
+│  └── hash      (MD5 pour détection changements)                         │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Endpoint RAG disponible
+
+```bash
+# Déclencher une ingestion manuelle
+curl -X POST http://localhost:8080/webhook/wibot/rag/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "full", "clear": true}'
+
+# Ingestion incrémentale
+curl -X POST http://localhost:8080/webhook/wibot/rag/ingest \
+  -d '{"mode": "incremental"}'
+```
+
+---
+
+## 11. Pistes d'Amélioration
+
+### Ce qui reste à faire
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -763,12 +843,11 @@ npm run dev
 │  ├── MFA (Multi-Factor Authentication)                                  │
 │  └── Session management avancé                                          │
 │                                                                          │
-│  📚 RAG (Retrieval Augmented Generation)                                │
-│  ├── Ingestion automatique de documents                                 │
-│  ├── Recherche vectorielle (pgvector)                                   │
-│  ├── Sources de données multiples (GLPI, SharePoint, etc.)             │
-│  ├── Chunking intelligent des documents                                 │
-│  └── Filtrage par permissions utilisateur                               │
+│  📚 RAG - AMÉLIORATIONS (base déjà fonctionnelle)                       │
+│  ├── Filtrage par permissions utilisateur ⬅️ PRIORITÉ                   │
+│  ├── Connecteurs sources externes (GLPI, SharePoint, Confluence)        │
+│  ├── Interface d'upload admin pour nouveaux documents                   │
+│  └── Statistiques d'utilisation du RAG                                  │
 │                                                                          │
 │  🎛️ ADMINISTRATION                                                       │
 │  ├── Interface d'administration                                         │
