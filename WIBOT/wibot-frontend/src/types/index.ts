@@ -164,6 +164,52 @@ export interface AnalyticsResponse {
 }
 
 // ============================================
+// ADMIN USERS TYPES
+// ============================================
+
+export interface AdminUser {
+  user_id: number;
+  username: string;
+  email: string | null;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+  used_tokens: number;
+  quota_tokens: number;
+}
+
+export interface AdminUsersResponse {
+  success: boolean;
+  users: AdminUser[];
+}
+
+export interface CreateUserRequest {
+  username: string;
+  password: string;
+  email?: string;
+  role?: string;
+  quota_tokens?: number;
+}
+
+export interface UpdateUserRequest {
+  user_id: number;
+  quota_tokens?: number;
+  add_tokens?: number;
+  role?: string;
+  is_active?: boolean;
+}
+
+export interface AdminUserResponse {
+  success: boolean;
+  user: AdminUser;
+}
+
+export interface DeleteUserResponse {
+  success: boolean;
+  deleted: { user_id: number; username: string };
+}
+
+// ============================================
 // STORE TYPES
 // ============================================
 
