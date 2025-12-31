@@ -8,6 +8,7 @@ import { ToastContainer, Spinner } from './components/ui';
 // Lazy load pages
 const Login = lazy(() => import('./pages/Login').then(m => ({ default: m.Login })));
 const Chat = lazy(() => import('./pages/Chat').then(m => ({ default: m.Chat })));
+const Supervision = lazy(() => import('./pages/Supervision').then(m => ({ default: m.Supervision })));
 
 // Loading fallback
 function PageLoader() {
@@ -46,6 +47,16 @@ function App() {
             element={
               <ProtectedRoute>
                 <Chat />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Protected supervision page (admin only - checked in component) */}
+          <Route
+            path="/supervision"
+            element={
+              <ProtectedRoute>
+                <Supervision />
               </ProtectedRoute>
             }
           />

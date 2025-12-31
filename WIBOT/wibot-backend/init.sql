@@ -49,12 +49,33 @@ CREATE TABLE IF NOT EXISTS messages (
     content          TEXT NOT NULL,
     tokens           INTEGER DEFAULT 0,
     attachments      JSONB,
+    -- Colonnes analytics (ajoutees pour supervision)
+    mode             VARCHAR(20) DEFAULT 'flash',
+    rag_used         BOOLEAN DEFAULT false,
+    files_count      INTEGER DEFAULT 0,
     created_at       TIMESTAMP DEFAULT NOW()
 );
+
+-- Migration: Ajouter colonnes si elles n'existent pas (pour BDD existantes)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'messages' AND column_name = 'mode') THEN
+        ALTER TABLE messages ADD COLUMN mode VARCHAR(20) DEFAULT 'flash';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'messages' AND column_name = 'rag_used') THEN
+        ALTER TABLE messages ADD COLUMN rag_used BOOLEAN DEFAULT false;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'messages' AND column_name = 'files_count') THEN
+        ALTER TABLE messages ADD COLUMN files_count INTEGER DEFAULT 0;
+    END IF;
+END $$;
 
 COMMENT ON TABLE messages IS 'Messages des conversations';
 COMMENT ON COLUMN messages.role IS 'user ou assistant uniquement';
 COMMENT ON COLUMN messages.attachments IS 'Metadonnees fichiers joints (optionnel)';
+COMMENT ON COLUMN messages.mode IS 'Mode IA utilise: code, flash, redaction';
+COMMENT ON COLUMN messages.rag_used IS 'Si le RAG a ete utilise pour cette reponse';
+COMMENT ON COLUMN messages.files_count IS 'Nombre de fichiers joints au message';
 
 -- ===========================================
 -- TABLE: user_token_usage

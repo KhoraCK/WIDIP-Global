@@ -102,6 +102,68 @@ export interface SpinnerProps {
 }
 
 // ============================================
+// ANALYTICS TYPES
+// ============================================
+
+export type AnalyticsPeriod = '24h' | '7d' | '30d';
+
+export interface AnalyticsTokens {
+  used: number;
+  quota: number;
+  percentage: number;
+}
+
+export interface AnalyticsMessagesByDay {
+  date: string;
+  count: number;
+  tokens: number;
+}
+
+export interface AnalyticsModes {
+  flash: number;
+  code: number;
+  redaction: number;
+}
+
+export interface AnalyticsConversations {
+  total: number;
+  active: number;
+}
+
+export interface AnalyticsUsers {
+  total: number;
+}
+
+export interface AnalyticsFiles {
+  total: number;
+  messagesWithFiles: number;
+}
+
+export interface AnalyticsRag {
+  queries: number;
+}
+
+export interface AnalyticsStats {
+  tokens: AnalyticsTokens;
+  messages: {
+    total: number;
+    today: number;
+    byDay: AnalyticsMessagesByDay[];
+  };
+  modes: AnalyticsModes;
+  conversations: AnalyticsConversations;
+  users: AnalyticsUsers;
+  files: AnalyticsFiles;
+  rag: AnalyticsRag;
+}
+
+export interface AnalyticsResponse {
+  success: boolean;
+  period: AnalyticsPeriod;
+  stats: AnalyticsStats;
+}
+
+// ============================================
 // STORE TYPES
 // ============================================
 

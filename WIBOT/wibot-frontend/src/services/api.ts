@@ -5,7 +5,9 @@ import type {
   ChatRequest,
   ChatResponse,
   Conversation,
-  Message
+  Message,
+  AnalyticsResponse,
+  AnalyticsPeriod
 } from '../types';
 import { getToken, removeToken } from './auth';
 
@@ -113,6 +115,17 @@ export interface TokensResponse {
 
 export async function getUserTokens(): Promise<TokensResponse> {
   const response = await api.get<TokensResponse>('/webhook/wibot/user/tokens');
+  return response.data;
+}
+
+// ============================================
+// ANALYTICS API (Admin only)
+// ============================================
+
+export async function getAnalytics(period: AnalyticsPeriod = '7d'): Promise<AnalyticsResponse> {
+  const response = await api.get<AnalyticsResponse>('/webhook/wibot/analytics', {
+    params: { period }
+  });
   return response.data;
 }
 
