@@ -5,7 +5,14 @@ import type {
   ChatRequest,
   ChatResponse,
   Conversation,
-  Message
+  Message,
+  AnalyticsResponse,
+  AnalyticsPeriod,
+  AdminUsersResponse,
+  CreateUserRequest,
+  UpdateUserRequest,
+  AdminUserResponse,
+  DeleteUserResponse
 } from '../types';
 import { getToken, removeToken } from './auth';
 
@@ -113,6 +120,43 @@ export interface TokensResponse {
 
 export async function getUserTokens(): Promise<TokensResponse> {
   const response = await api.get<TokensResponse>('/webhook/wibot/user/tokens');
+  return response.data;
+}
+
+// ============================================
+// ANALYTICS API (Admin only)
+// ============================================
+
+export async function getAnalytics(period: AnalyticsPeriod = '7d'): Promise<AnalyticsResponse> {
+  const response = await api.get<AnalyticsResponse>('/webhook/wibot/analytics', {
+    params: { period }
+  });
+  return response.data;
+}
+
+// ============================================
+// ADMIN USERS API (Admin only)
+// ============================================
+
+export async function getAdminUsers(): Promise<AdminUsersResponse> {
+  const response = await api.get<AdminUsersResponse>('/webhook/wibot/admin/users');
+  return response.data;
+}
+
+export async function createUser(data: CreateUserRequest): Promise<AdminUserResponse> {
+  const response = await api.post<AdminUserResponse>('/webhook/wibot/admin/users', data);
+  return response.data;
+}
+
+export async function updateUser(data: UpdateUserRequest): Promise<AdminUserResponse> {
+  const response = await api.put<AdminUserResponse>('/webhook/wibot/admin/users', data);
+  return response.data;
+}
+
+export async function deleteUser(userId: number): Promise<DeleteUserResponse> {
+  const response = await api.delete<DeleteUserResponse>('/webhook/wibot/admin/users', {
+    data: { user_id: userId }
+  });
   return response.data;
 }
 

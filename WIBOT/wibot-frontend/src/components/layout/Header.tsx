@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { LogOut, User, ChevronDown, Coins } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { LogOut, User, ChevronDown, Coins, BarChart3, Users } from 'lucide-react';
 import { useAuthStore, useChatStore } from '../../store';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -119,6 +120,27 @@ export function Header() {
                 <p className="text-sm text-text-primary font-medium">{user?.username}</p>
                 <p className="text-xs text-text-secondary capitalize">{user?.role}</p>
               </div>
+              {/* Admin links */}
+              {user?.role === 'admin' && (
+                <>
+                  <Link
+                    to="/supervision"
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-text-primary hover:bg-bg-primary transition-colors"
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                    Supervision
+                  </Link>
+                  <Link
+                    to="/admin/users"
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-text-primary hover:bg-bg-primary transition-colors"
+                  >
+                    <Users className="w-4 h-4" />
+                    Utilisateurs
+                  </Link>
+                </>
+              )}
               <button
                 onClick={() => {
                   setIsDropdownOpen(false);

@@ -102,6 +102,114 @@ export interface SpinnerProps {
 }
 
 // ============================================
+// ANALYTICS TYPES
+// ============================================
+
+export type AnalyticsPeriod = '24h' | '7d' | '30d';
+
+export interface AnalyticsTokens {
+  used: number;
+  quota: number;
+  percentage: number;
+}
+
+export interface AnalyticsMessagesByDay {
+  date: string;
+  count: number;
+  tokens: number;
+}
+
+export interface AnalyticsModes {
+  flash: number;
+  code: number;
+  redaction: number;
+}
+
+export interface AnalyticsConversations {
+  total: number;
+  active: number;
+}
+
+export interface AnalyticsUsers {
+  total: number;
+}
+
+export interface AnalyticsFiles {
+  total: number;
+  messagesWithFiles: number;
+}
+
+export interface AnalyticsRag {
+  queries: number;
+}
+
+export interface AnalyticsStats {
+  tokens: AnalyticsTokens;
+  messages: {
+    total: number;
+    today: number;
+    byDay: AnalyticsMessagesByDay[];
+  };
+  modes: AnalyticsModes;
+  conversations: AnalyticsConversations;
+  users: AnalyticsUsers;
+  files: AnalyticsFiles;
+  rag: AnalyticsRag;
+}
+
+export interface AnalyticsResponse {
+  success: boolean;
+  period: AnalyticsPeriod;
+  stats: AnalyticsStats;
+}
+
+// ============================================
+// ADMIN USERS TYPES
+// ============================================
+
+export interface AdminUser {
+  user_id: number;
+  username: string;
+  email: string | null;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+  used_tokens: number;
+  quota_tokens: number;
+}
+
+export interface AdminUsersResponse {
+  success: boolean;
+  users: AdminUser[];
+}
+
+export interface CreateUserRequest {
+  username: string;
+  password: string;
+  email?: string;
+  role?: string;
+  quota_tokens?: number;
+}
+
+export interface UpdateUserRequest {
+  user_id: number;
+  quota_tokens?: number;
+  add_tokens?: number;
+  role?: string;
+  is_active?: boolean;
+}
+
+export interface AdminUserResponse {
+  success: boolean;
+  user: AdminUser;
+}
+
+export interface DeleteUserResponse {
+  success: boolean;
+  deleted: { user_id: number; username: string };
+}
+
+// ============================================
 // STORE TYPES
 // ============================================
 

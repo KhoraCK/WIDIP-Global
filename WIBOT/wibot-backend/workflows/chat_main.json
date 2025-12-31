@@ -449,7 +449,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const agentResponse = $input.first().json.output;\nconst jwtData = $('Prepare Quota').first().json;\n\n// Estimation tokens (environ 4 chars par token)\nconst messageTokens = Math.ceil(jwtData.message.length / 4);\nconst responseTokens = Math.ceil(agentResponse.length / 4);\nconst tokensUsed = messageTokens + responseTokens;\n\nconst newUsedTokens = jwtData.usedTokens + tokensUsed;\nconst tokensRemaining = jwtData.quotaTokens - newUsedTokens;\n\nreturn [{\n  json: {\n    userId: jwtData.userId,\n    conversationId: jwtData.conversationId,\n    message: jwtData.message,\n    response: agentResponse,\n    tokensUsed,\n    newUsedTokens,\n    tokensRemaining: Math.max(0, tokensRemaining),\n    quotaTokens: jwtData.quotaTokens\n  }\n}];"
+        "jsCode": "const agentResponse = $input.first().json.output;\nconst jwtData = $('Prepare Quota').first().json;\n\n// Estimation tokens (environ 4 chars par token)\nconst messageTokens = Math.ceil(jwtData.message.length / 4);\nconst responseTokens = Math.ceil(agentResponse.length / 4);\nconst tokensUsed = messageTokens + responseTokens;\n\nconst newUsedTokens = jwtData.usedTokens + tokensUsed;\nconst tokensRemaining = jwtData.quotaTokens - newUsedTokens;\n\n// Analytics: mode, fichiers, RAG\nconst mode = jwtData.mode || 'flash';\nconst filesCount = jwtData.files ? jwtData.files.length : 0;\nconst ragUsed = jwtData.hasFiles || false; // RAG utilise si fichiers joints\n\nreturn [{\n  json: {\n    userId: jwtData.userId,\n    conversationId: jwtData.conversationId,\n    message: jwtData.message,\n    response: agentResponse,\n    tokensUsed,\n    newUsedTokens,\n    tokensRemaining: Math.max(0, tokensRemaining),\n    quotaTokens: jwtData.quotaTokens,\n    // Analytics\n    mode: mode,\n    filesCount: filesCount,\n    ragUsed: ragUsed\n  }\n}];"
       },
       "id": "fdcd3535-5ce0-42e7-91b1-d2a70153c598",
       "name": "Prepare Save",
@@ -484,7 +484,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO messages (conversation_id, user_id, role, content, tokens, created_at)\nVALUES (\n  '{{ $('Prepare Save').first().json.conversationId }}'::uuid,\n  {{ $('Prepare Save').first().json.userId }},\n  'user',\n  '{{ $('Prepare Save').first().json.message.replace(/'/g, \"''\").replace(/\\\\/g, '\\\\\\\\') }}',\n  {{ Math.ceil($('Prepare Save').first().json.message.length / 4) }},\n  NOW()\n);",
+        "query": "INSERT INTO messages (conversation_id, user_id, role, content, tokens, mode, rag_used, files_count, created_at)\nVALUES (\n  '{{ $('Prepare Save').first().json.conversationId }}'::uuid,\n  {{ $('Prepare Save').first().json.userId }},\n  'user',\n  '{{ $('Prepare Save').first().json.message.replace(/'/g, \"''\").replace(/\\\\/g, '\\\\\\\\') }}',\n  {{ Math.ceil($('Prepare Save').first().json.message.length / 4) }},\n  '{{ $('Prepare Save').first().json.mode }}',\n  {{ $('Prepare Save').first().json.ragUsed }},\n  {{ $('Prepare Save').first().json.filesCount }},\n  NOW()\n);",
         "options": {}
       },
       "id": "200ae46e-230c-4ab2-ab0d-6d05d0fdc83b",
@@ -505,7 +505,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO messages (conversation_id, user_id, role, content, tokens, created_at)\nVALUES (\n  '{{ $('Prepare Save').first().json.conversationId }}'::uuid,\n  {{ $('Prepare Save').first().json.userId }},\n  'assistant',\n  '{{ $('Prepare Save').first().json.response.replace(/'/g, \"''\").replace(/\\\\/g, '\\\\\\\\') }}',\n  {{ Math.ceil($('Prepare Save').first().json.response.length / 4) }},\n  NOW()\n);",
+        "query": "INSERT INTO messages (conversation_id, user_id, role, content, tokens, mode, rag_used, files_count, created_at)\nVALUES (\n  '{{ $('Prepare Save').first().json.conversationId }}'::uuid,\n  {{ $('Prepare Save').first().json.userId }},\n  'assistant',\n  '{{ $('Prepare Save').first().json.response.replace(/'/g, \"''\").replace(/\\\\/g, '\\\\\\\\') }}',\n  {{ Math.ceil($('Prepare Save').first().json.response.length / 4) }},\n  '{{ $('Prepare Save').first().json.mode }}',\n  {{ $('Prepare Save').first().json.ragUsed }},\n  0,\n  NOW()\n);",
         "options": {}
       },
       "id": "5724d528-248a-4746-803d-b4c5f1c06fa3",
